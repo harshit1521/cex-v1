@@ -1,0 +1,65 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider   = "prisma-client"
+  output     = "./generated"
+  engineType = "client"
+  runtime    = "bun"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User{
+  id Int @id @default(autoincrement())
+  username String
+  password String
+}
+
+model Fills{
+  id Int @id
+  stockId Int
+  price Int
+  quantity Int
+  buyOrderId Int
+  sellOrderId Int
+}
+
+model Order{
+  id Int @id @unique
+  userId Int @unique
+  side side
+  type type
+  stockId Int
+  price Int
+  quantity Int 
+  filledQty Int
+  status status
+
+}
+
+model Stock{
+  id Int @id @unique
+  title String
+  symbol String
+}
+
+enum side {
+  BUY
+  SELL
+}
+
+enum type {
+  LIMIT 
+  MARKET
+}
+
+enum status {
+  FILLED
+  PENDING
+  CANCELLED
+}
