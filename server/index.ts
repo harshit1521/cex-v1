@@ -1,7 +1,10 @@
-import express, { Request, Response } from "express";
+import express from "express";
 import crypto from "crypto";
+import jwt from "jsonwebtoken";
+import { hash, password } from "bun";
 
 const app = express();
+const secret = process.env.JWT_SECRET!;
 app.use(express.json());
 
 // types 
@@ -110,7 +113,7 @@ const ORDERBOOK: OrderBook = {
 };
 
 // --- Auth ---
-app.post("/signup", (req, res) => {
+app.post("/signup", async (req, res) => {
 
   // fetch data
   const { username, password } = req.body;
@@ -127,13 +130,17 @@ app.post("/signup", (req, res) => {
   // generate user id 
   const id = crypto.randomUUID();
 
+  // hash password 
+
+  const hash = await password.hash(password, "bcrypt");
+
   // store user
   USERS.set(id, {
-    username, password
+    username, password: hash
   })
 
   // initialize balance
-  BALANCES.set(id,{
+  BALANCES.set(id, {
     USD: {
       available: 10000,
       locked: 0
@@ -145,10 +152,50 @@ app.post("/signup", (req, res) => {
   })
 });
 
-app.post("/login", (req, res) => {
+app.post("/login", async (req, res) => {
   // 1. find user by username
   // 2. compare hashed password
   // 3. return JWT / session token
+
+  // fetch username 
+  const { username, password } = req.body;
+
+  let userId: string | undefined;
+  let user : { username: string; password: string} | undefined;
+
+  for(const [id , currentUser] of USERS.entries()) {
+
+    if(currentUser.username === username) {
+
+      userId = id;
+      user = currentUser;
+      break;
+    }
+  }
+  if (!user || !userId) {
+    return res.status(401).json({
+      error: "invalid username or password",
+    });
+  }
+
+  const isValid = await password.compare(password, user.password);
+
+  if (!isValid) {
+    return res.status(401).json({
+      error: "invalid username or password"
+    })
+  }
+
+  const token = jwt.sign({ userId }, secret);
+
+  res.status(201).json({
+    message: "login successfull",
+    user: {
+      userId: userId,
+      username: username
+    },
+    token
+  })
 });
 
 // --- Orders ---
