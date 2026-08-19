@@ -1,30 +1,148 @@
-const express = require("express");
+import express, { Request, Response } from "express";
+import crypto from "crypto";
+
 const app = express();
 app.use(express.json());
 
+// types 
+
+type User = {
+  username: string;
+  password: string;
+};
+
+type Balance = {
+  available: number;
+  locked: number;
+};
+
+type UserBalances = {
+  [asset: string]: Balance;
+};
+
+type Stock = {
+  id: number;
+  title: string;
+  symbol: string;
+};
+
+type OrderSide = "BUY" | "SELL";
+type OrderType = "LIMIT" | "MARKET";
+
+type Order = {
+  id: string;
+  userId: string;
+  side: OrderSide;
+  type: OrderType;
+  symbol: string;
+  price?: number;
+  qty: number;
+  filledQty: number;
+  status: "OPEN" | "FILLED" | "CANCELLED";
+};
+
+type Fill = {
+  id: string;
+  orderId: string;
+  symbol: string;
+  price: number;
+  qty: number;
+};
+
+type PriceLevel = {
+  [price: string]: number;
+};
+
+type OrderBookSide = {
+  bids: PriceLevel;
+  asks: PriceLevel;
+};
+
+type OrderBook = {
+  [symbol: string]: OrderBookSide;
+};
+
 // --- In-memory state ---
-const USERS = [];
-const STOCKS = [
-  { id: 1, title: "AXIS BANK", symbol: "AXIS" },
-  { id: 2, title: "HDFC BANK", symbol: "HDFC" },
-  { id: 3, title: "TATA Steel", symbol: "TATA" },
+
+let id: number = 1;
+
+const USERS = new Map<string, User>();
+
+const ORDERS: Order[] = [];
+
+const FILLS: Fill[] = [];
+
+const STOCKS: Stock[] = [
+  {
+    id: 1,
+    title: "AXIS BANK",
+    symbol: "AXIS",
+  },
+  {
+    id: 2,
+    title: "HDFC BANK",
+    symbol: "HDFC",
+  },
+  {
+    id: 3,
+    title: "TATA Steel",
+    symbol: "TATA",
+  },
 ];
-const ORDERS = [];
-const FILLS = [];
-const BALANCES = {}; // { userId: { INR: {available, locked}, AXIS: {available, locked}, ... } }
-const ORDERBOOK = {
-  AXIS: { bids: {}, asks: {} },
-  HDFC: { bids: {}, asks: {} },
-  TATA: { bids: {}, asks: {} },
+
+const BALANCES = new Map<string, UserBalances>();
+
+const ORDERBOOK: OrderBook = {
+  AXIS: {
+    bids: {},
+    asks: {},
+  },
+
+  HDFC: {
+    bids: {},
+    asks: {},
+  },
+
+  TATA: {
+    bids: {},
+    asks: {},
+  },
 };
 
 // --- Auth ---
 app.post("/signup", (req, res) => {
-  // const { username, password } = req.body;
-  // 1. check username not taken
-  // 2. hash password (bcrypt/argon2)
-  // 3. push to USERS
-  // 4. init BALANCES[userId] with INR: { available: 0, locked: 0 }
+
+  // fetch data
+  const { username, password } = req.body;
+
+  // check if user exists 
+  for (const user of USERS.values()) {
+    if (user.username === username) {
+      return res.status(409).json({
+        error: "user already exists"
+      })
+    }
+  }
+
+  // generate user id 
+  const id = crypto.randomUUID();
+
+  // store user
+  USERS.set(id, {
+    username, password
+  })
+
+  // initialize balance
+  BALANCES.set(id,{
+    USD: {
+      available: 10000,
+      locked: 0
+    }
+  })
+
+  res.status(201).json({
+    userId: id,
+  })
 });
 
 app.post("/login", (req, res) => {
